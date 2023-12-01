@@ -1,0 +1,169 @@
+
+service: s3-lambda-dynamodb
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: java17
+  profile: kazitanvir.azad@xxxxxxxxxxxxxxx.com
+  stage: dev
+  timeout: 10
+  memorySize: 128
+  environment:
+    REGION: ${self:custom.region}
+    PROFILE_NAME: ${self:provider.profile}
+    DYNAMODB_CREDENTIALTABLE_NAME: ${self:custom.credential_table_name}
+    DYNAMODB_CREDENTIALTABLE_PRIMARYKEY: ${self:custom.credential_table_primaryKey}
+    DYNAMODB_S3OUTPUTTABLE_NAME: ${self:custom.s3output_table_name}
+    DYNAMODB_S3OUTPUTTABLE_PRIMARYKEY: ${self:custom.s3output_table_primaryKey}
+    DYNAMODB_PRODUCTINVENTORYTABLE_NAME: ${self:custom.productInventory_table_name}
+    DYNAMODB_PRODUCTINVENTORYTABLE_PRIMARYKEY: ${self:custom.productInventory_primaryKey}
+    S3BUCKET_NAME: ${self:custom.s3_bucket_name}
+  iam:
+    role: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxx-xxxx
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+        - dynamodb:DeleteItem
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:UpdateItem
+        - dynamodb:DescribeStream
+        - dynamodb:GetRecords
+        - dynamodb:GetShardIterator
+        - dynamodb:ListStreams
+      Resource: arn:aws:dynamodb:us-east-1:xxxxxxxxxxxx:table/xxxxxxx-inventory-xxxx
+  apiGateway:
+    apiKeys:
+      - xxxxxxxxxxAPIKey
+    apiKeySourceType: HEADER
+    restApiId: ${self:custom.restApiId}
+    restApiRootResourceId: ${self:custom.restApiRootResourceId}
+
+
+
+custom:
+  region: us-east-1
+  credential_table_name: xxxxxxxxxxxxxxx
+  credential_table_primaryKey: profile_name
+  s3output_table_name: xxxxxxxxTable
+  s3output_table_primaryKey: fileName
+  productInventory_table_name: xxxxxxx-inventory-xxxx
+  productInventory_primaryKey: productId
+  baseapiendpoint: /api/v1/product-service
+  restApiId: xxxxxxxxxx
+  restApiRootResourceId: xxxxxx
+  s3_bucket_name: xxxx-xxxx
+
+
+package:
+  artifact: target/${self:service}-${self:provider.stage}-1.0.jar
+  individually: true
+  exclude:
+    - README.md
+    - .git/**
+    - postman
+    - .settings/**
+    - .classpath
+    - .gitignore
+    - .project
+    - .idea
+
+
+functions:
+  FirstS3LambdaHandler:
+    handler: com.serverless.handler.FirstS3LambdaHandler
+    memorySize: 1024
+    timeout: 15
+  AddProductToDynamoDB:
+    handler: com.serverless.handler.AddProductToDynamoDBHandler
+    memorySize: 1024
+    timeout: 15
+    events:
+      - http:
+          path: /addproducttodynamodb
+          method: post
+          private: true
+  AddProductToS3Bucket:
+    handler: com.serverless.handler.AddProductToS3BucketHandler
+    memorySize: 1024
+    timeout: 15
+    events:
+      - http:
+          path: /addproducttos3
+          method: post
+          private: true
+  CopyS3ObjectToDynamoDB:
+    handler: com.serverless.handler.CopyS3ObjectToDynamoDBHandler
+    memorySize: 1024
+    timeout: 15
+    events:
+      - http:
+          path: /copys3toddb
+          method: put
+          private: true
+  CopyDynamoDBToS3Object:
+    handler: com.serverless.handler.CopyDynamoDBToS3ObjectHandler
+    memorySize: 1024
+    timeout: 15
+    events:
+      - http:
+          path: /copyddbtos3
+          method: put
+          private: true
+
+
+
+
+resources:
+  Resources:
+    CredentialDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: profile_name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: profile_name
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_CREDENTIALTABLE_NAME}
+    S3outputDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: fileName
+            AttributeType: S
+        KeySchema:
+          - AttributeName: fileName
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_S3OUTPUTTABLE_NAME}
+    S3LambdaDynamoDBRestApi:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: xx-xxxxxx-xxxxxxxx-xxxxxxx
+    ApiGatewayUsagePlan:
+      Type: AWS::ApiGateway::UsagePlan
+      Properties:
+        ApiStages:
+          ApiId: ${self:custom.restApiId}
+          Stage: ${self:provider.stage}
+        Quota:
+          Limit: 10000
+          Offset: 1
+          Period: MONTH
+        Throttle:
+          BurstLimit: 2000
+          RateLimit: 1000
+        UsagePlanName: xxxxxxxxxxxxxxxxxxx
+
+
